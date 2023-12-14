@@ -1,5 +1,8 @@
 <template>
   <div id="d3-map"></div>
+  <button @click="toggleAnimation">{{ isAnimating ? '暂停' : '播放' }}</button>
+  <input type="range" min="0" :max="keys.length - 1" v-model="timeIndex" @input="updatePoints" />
+  <span>{{ keys[timeIndex] }}</span>
 </template>
 
 <script>
@@ -14,7 +17,6 @@ import data from '../assets/part.json';
 // 对记录按秒分组
 let group_data = d3.group(data.map(d=>{return {d,time:new Date(Math.floor(d.time_meas/1000000)*1000)}}),d=>d.time)
 const firstKey = group_data.keys().next().value //最开始时间的键值
-const keys = Array.from(group_data.keys()); // 获取所有时间键值
 
 // 投影方法
 const projection = d3.geoIdentity().fitSize([800, 600], geojson);
@@ -23,10 +25,17 @@ const projection = d3.geoIdentity().fitSize([800, 600], geojson);
 
 export default {
   name: 'D3Map',
+  data() {
+    return {
+      isAnimating: true,
+      timeIndex: 0,
+      keys : Array.from(group_data.keys()), // 获取所有时间键值
+    };
+  },
   mounted() {
     this.drawMap();
     this.updatePoints(); // 调用更新点的方法
-    setInterval(this.updatePoints, 300); // 每隔1秒钟更新一次点的位置
+    this.animationInterval = setInterval(this.updatePoints, 1000); // 每隔1秒钟更新一次点的位置
   },
   methods: {
     drawMap() {
@@ -110,13 +119,38 @@ export default {
           // 需要根据种类确定大小颜色
           // 需要加入tooltip，查看点的信息
       // 目前只展示了前100个数据，需要调整为根据时间筛选
-
+      console.log(this.keys)
       // 需要加入图例，等所有视图合并后确定颜色
     },
     // 更新点的位置的方法
     updatePoints() {
-      // 获取下一个时间的数据
-      const nextTimeKey = this.getNextTimeKey(); // 实现该方法获取下一个时间的键值
+      let currentKey = d3.select('#p').selectAll(".ptts").datum().time;
+      let currentIndex = this.keys.findIndex(key => {
+        // 在这里进行临时的转换操作，将时间格式转换为 Date 对象
+        let keyTime = new Date(key);
+        let currentKeyTime = new Date(currentKey);
+        return keyTime.getTime() === currentKeyTime.getTime();
+      });
+      let updateKey; // 声明 updateKey 在方法内部的范围
+      // console.log(d3.select('#p').selectAll(".ptts").datum().time,this.keys[1])
+      if (!this.isAnimating && this.keys[this.timeIndex]==currentKey) {  // 没拖动时间轴+暂停状态，什么都不做
+        return
+      }
+      else if (this.isAnimating && this.keys[this.timeIndex]==currentKey) {// 没拖动时间轴+播放状态，往后面一个key更新
+        if (currentIndex==this.keys.length-1) { //播放到最后了,结束
+          this.toggleAnimation()
+          return
+        }
+        updateKey = this.keys[currentIndex + 1]
+        this.timeIndex = currentIndex + 1 
+      }
+      else if (this.keys[this.timeIndex]!=currentKey) { // 拖动了时间轴
+        updateKey = this.keys[this.timeIndex]
+      }
+      else {
+        console.log('fuck')
+      }
+      // console.log(updateKey)  //check
 
       // 清空现有的点
       d3.select('#d3-map')
@@ -126,7 +160,7 @@ export default {
       const p = d3.select('#p'); // 选择 p 容器
       p
         .selectAll(".ptts")
-        .data(group_data.get(nextTimeKey))
+        .data(group_data.get(updateKey))
         .enter()
         .append('circle')
         .attr('cx', d=>projection([d.d.x,d.d.y])[0])
@@ -135,21 +169,17 @@ export default {
         .attr('id', d=>d.d.id)
         .classed('ptts',true)
         .attr('fill', 'red');
-
-      
     },
-    // 获取下一个时间的键值的方法
-    getNextTimeKey() {
-      // console.log(d3.select('#p').selectAll(".ptts").datum())
-      let currentKey = d3.select('#p').selectAll(".ptts").datum().time;
-      let currentIndex = keys.indexOf(currentKey);
-      if (currentIndex< keys.length-1) {
-        return keys[currentIndex+1]
+    toggleAnimation() {
+      this.isAnimating = !this.isAnimating;
+      if (this.isAnimating) {
+        if (this.timeIndex == this.keys.length-1) { // 重播的核心逻辑
+          this.timeIndex = 0;
+        }
+        this.animationInterval = setInterval(this.updatePoints, 1000);
+      } else {
+        clearInterval(this.animationInterval);
       }
-      else {
-        return keys[-1]
-      }
-
     }
 
   },
