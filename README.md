@@ -2,7 +2,7 @@
 
 ## Data
 
-从[here](https://www.123pan.com/s/Cz8DVv-uAYkv.html)下载后按src/assets/*.json放置
+从[Here](https://www.123pan.com/s/Cz8DVv-uAYkv.html)下载后按src/assets/*.json放置
 
 
 ## Project setup
