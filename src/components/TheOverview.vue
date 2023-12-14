@@ -119,7 +119,6 @@ export default {
           // 需要根据种类确定大小颜色
           // 需要加入tooltip，查看点的信息
       // 目前只展示了前100个数据，需要调整为根据时间筛选
-      console.log(this.keys)
       // 需要加入图例，等所有视图合并后确定颜色
     },
     // 更新点的位置的方法
@@ -132,7 +131,6 @@ export default {
         return keyTime.getTime() === currentKeyTime.getTime();
       });
       let updateKey; // 声明 updateKey 在方法内部的范围
-      // console.log(d3.select('#p').selectAll(".ptts").datum().time,this.keys[1])
       if (!this.isAnimating && this.keys[this.timeIndex]==currentKey) {  // 没拖动时间轴+暂停状态，什么都不做
         return
       }
