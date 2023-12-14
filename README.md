@@ -1,4 +1,9 @@
-# fin_pj
+# 数据可视化期末PJ
+
+## Data
+
+从[here](https://www.123pan.com/s/Cz8DVv-uAYkv.html)下载后按src/assets/*.json放置
+
 
 ## Project setup
 ```
