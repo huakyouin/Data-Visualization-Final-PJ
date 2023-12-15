@@ -1,8 +1,12 @@
 <template>
-  <div id="d3-map"></div>
-  <button @click="toggleAnimation">{{ isAnimating ? '暂停' : '播放' }}</button>
-  <input type="range" min="0" :max="keys.length - 1" v-model="timeIndex" @input="updatePoints" />
-  <span>{{ keys[timeIndex] }}</span>
+  <div id="overview" ref="parentContainer">
+    <div id="d3-map"></div>
+    <div style="margin-right: 10px;">
+      <button @click="toggleAnimation">{{ isAnimating ? '暂停' : '播放' }}</button>
+      <input type="range" min="0" :max="keys.length - 1" v-model="timeIndex" @input="updatePoints" />
+    </div>
+    <span>{{ keys[timeIndex] }}</span>
+  </div>
 </template>
 
 <script>
@@ -17,11 +21,8 @@ import data from '../assets/part.json';
 // 对记录按秒分组
 let group_data = d3.group(data.map(d=>{return {d,time:new Date(Math.floor(d.time_meas/1000000)*1000)}}),d=>d.time)
 const firstKey = group_data.keys().next().value //最开始时间的键值
+const Width = 700;
 
-// 投影方法
-const projection = d3.geoIdentity().fitSize([800, 600], geojson);
-      //这里暂时没有翻转y轴，所以可能看起来和示例是反的，后面会调整
-      const path = d3.geoPath().projection(projection);
 
 export default {
   name: 'D3Map',
@@ -30,21 +31,40 @@ export default {
       isAnimating: true,
       timeIndex: 0,
       keys : Array.from(group_data.keys()), // 获取所有时间键值
+      parentContainerWidth : 0,
+      widthToHeightRatio: 0.6, //svg 宽高比
+      projection: null,
+      path: null,
     };
   },
   mounted() {
+    // 获取实际宽度
+    this.parentContainerWidth = this.$refs.parentContainer.offsetWidth;
+    // 投影方法
+    this.projection = d3.geoIdentity().fitSize([this.parentContainerWidth, this.parentContainerWidth * this.widthToHeightRatio], geojson);
+    //这里暂时没有翻转y轴，所以可能看起来和示例是反的，后面会调整
+    this.path = d3.geoPath().projection(this.projection);
+
     this.drawMap();
     this.updatePoints(); // 调用更新点的方法
     this.animationInterval = setInterval(this.updatePoints, 1000); // 每隔1秒钟更新一次点的位置
+    // 创建缩放对象
+    const zoom = d3.zoom()
+      .scaleExtent([1, 8]) // 设置缩放范围，最小为 1 倍，最大为 8 倍
+      .on('zoom', this.zoomed); // 创建 zoomed 方法用于处理缩放事件
+    // 将缩放对象应用到地图的 SVG 元素上
+    d3.select('#d3-map svg').call(zoom);
+
+
   },
   methods: {
     drawMap() {
-
+      
       const svg = d3
         .select('#d3-map')
         .append('svg')
-        .attr('width', 800)
-        .attr('height', 600);
+        .attr('width', this.parentContainerWidth)
+        .attr('height', this.parentContainerWidth*this.widthToHeightRatio);
 
       const background = svg.append('g')
 
@@ -53,7 +73,7 @@ export default {
         .data(geojson.features)
         .enter()
         .append('path')
-        .attr('d', path)
+        .attr('d', this.path)
         .style('fill', 'none')
         .style('stroke', 'steelblue')
         .style('stroke-width', 2);
@@ -63,7 +83,7 @@ export default {
         .data(crosswalk.features)
         .enter()
         .append('path')
-        .attr('d', path)
+        .attr('d', this.path)
         .style('fill', 'none')
         .style('stroke', 'green')
         .style('stroke-width', 2)
@@ -75,7 +95,7 @@ export default {
         .enter()
         .append('path')
         .attr('class', 'stopline')
-        .attr('d', path)
+        .attr('d', this.path)
         .style('fill', 'none')
         .style('stroke', 'red')
         .style('stroke-width', 2);
@@ -86,7 +106,7 @@ export default {
         .enter()
         .append('path')
         .attr('class', 'lane')
-        .attr('d', path)
+        .attr('d', this.path)
         .style('fill', 'none')
         .style('stroke', 'darkgray')
         .style('stroke-width', 1);
@@ -96,8 +116,8 @@ export default {
         .data(signal.features)
         .enter()
         .append('circle')
-        .attr('cx', d => projection(d.geometry.coordinates)[0])
-        .attr('cy', d => projection(d.geometry.coordinates)[1])
+        .attr('cx', d => this.projection(d.geometry.coordinates)[0])
+        .attr('cy', d => this.projection(d.geometry.coordinates)[1])
         .attr('r', 2)
         .style('fill', 'orange');
       // 静态数据全部载入，尺寸/颜色需要调整
@@ -110,8 +130,8 @@ export default {
         .data(group_data.get(firstKey))
         .enter()
         .append('circle')
-        .attr('cx', d=>projection([d.d.x,d.d.y])[0])
-        .attr('cy', d=>projection([d.d.x,d.d.y])[1])
+        .attr('cx', d=>this.projection([d.d.x,d.d.y])[0])
+        .attr('cy', d=>this.projection([d.d.x,d.d.y])[1])
         .attr('r', 3) 
         .attr('id', d=>d.d.id)
         .classed('ptts',true)
@@ -161,8 +181,8 @@ export default {
         .data(group_data.get(updateKey))
         .enter()
         .append('circle')
-        .attr('cx', d=>projection([d.d.x,d.d.y])[0])
-        .attr('cy', d=>projection([d.d.x,d.d.y])[1])
+        .attr('cx', d=>this.projection([d.d.x,d.d.y])[0])
+        .attr('cy', d=>this.projection([d.d.x,d.d.y])[1])
         .attr('r', 3) 
         .attr('id', d=>d.d.id)
         .classed('ptts',true)
@@ -178,9 +198,21 @@ export default {
       } else {
         clearInterval(this.animationInterval);
       }
-    }
+    },
+    // 处理缩放事件的方法
+    zoomed(event) {
+      const { transform } = event;
+      d3.select('#d3-map g').attr('transform', transform); // 将缩放变换应用到地图的 g 元素上
+      d3.select('#d3-map #p').attr('transform', transform); // 将缩放变换应用到 p 容器上
+    },
 
   },
   
 };
 </script>
+
+<style>
+input[type="range"] {
+  width: 300px; /* 设置input[type="range"]的宽度 */
+}
+</style>
